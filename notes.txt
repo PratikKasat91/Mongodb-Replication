@@ -1,0 +1,16 @@
+Replica Set:
+Instead of using standalone single mongod server, use multiple ones keeping copies of the same data using a Replica Set.
+
+group of servers: one primary taking writes and multiple secondaries that keep copies of the primary's data.
+if primary crashes, secondaries can elect a new primary from amongst themselves.
+
+Setting up replica set:
+
+rsconf = {
+  _id: 'mongodrepl',
+  members: [
+  {_id: 0, host: 'mongod0:27017'}, 
+  {_id: 1, host: 'mongod1:27017'},
+  {_id: 2, host: 'mongodarb:27017'},
+  ]
+}

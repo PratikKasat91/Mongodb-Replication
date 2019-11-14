@@ -1,0 +1,88 @@
+version: '3.7'
+
+services:
+  # data bearing node 1
+  mongod0:
+    container_name: mongod0
+    hostname: mongod0
+    image: mongo:4.0.8
+    command: mongod --replSet mongodrepl --smallfiles --oplogSize 3 --bind_ip_all --keyFile /run/secrets/MONGO_KEYFILE
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/MONGO_INITDB_ROOT_USERNAME
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/MONGO_INITDB_ROOT_PASSWORD
+    secrets:
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - source: MONGO_KEYFILE
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongoData0:/data/db
+    networks:
+      - mongonet
+
+  # data bearing node 2
+  mongod1:
+    container_name: mongod1
+    hostname: mongod1
+    image: mongo:4.0.8
+    command: mongod --replSet mongodrepl --smallfiles --oplogSize 3 --bind_ip_all --keyFile /run/secrets/MONGO_KEYFILE
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/MONGO_INITDB_ROOT_USERNAME
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/MONGO_INITDB_ROOT_PASSWORD
+    secrets:
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - source: MONGO_KEYFILE
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongoData1:/data/db
+    networks:
+      - mongonet
+
+  # arbiter
+  mongodarb:
+    container_name: mongodarb
+    hostname: mongodarb
+    image: mongo:4.0.8
+    command: mongod --replSet mongodrepl --smallfiles --oplogSize 3 --bind_ip_all --keyFile /run/secrets/MONGO_KEYFILE
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/MONGO_INITDB_ROOT_USERNAME
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/MONGO_INITDB_ROOT_PASSWORD
+    secrets:
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - source: MONGO_KEYFILE
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongoDataArb:/data/db
+    networks:
+      - mongonet
+
+networks:
+  mongonet:
+    name: mongonet
+
+volumes:
+  mongoData0:
+  mongoData1:
+  mongoDataArb:
+
+secrets:
+  MONGO_INITDB_ROOT_USERNAME:
+    file: ./secrets/MONGO_INITDB_ROOT_USERNAME
+  MONGO_INITDB_ROOT_PASSWORD:
+    file: ./secrets/MONGO_INITDB_ROOT_PASSWORD
+  MONGO_KEYFILE:
+    external: true
