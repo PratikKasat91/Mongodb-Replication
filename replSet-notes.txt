@@ -1,0 +1,79 @@
+Replica Set:
+Instead of using standalone single mongod server, use multiple ones keeping copies of the same data using a Replica Set.
+
+group of servers: one primary taking writes and multiple secondaries that keep copies of the primary's data.
+if primary crashes, secondaries can elect a new primary from amongst themselves.
+
+Setting up replica set:
+
+rsconf = {
+  _id: 'mongodrepl',
+  members: [
+  {_id: 0, host: 'mongod0:27017'}, 
+  {_id: 1, host: 'mongod1:27017'},
+  {_id: 2, host: 'mongodarb:27017'},
+  ]
+}
+
+rs.initiate(rsconf);
+Alternatively: db.adminCommand({ 'replSetInitiate': rsconf});
+insert a few recors on primary; check those records getting replicated in secondary.
+Experiment: Shutdown primary: db.adminCommand({shutdown: 1}). Watch the reelection and one of your secondary taking up the primary role.
+
+Key points:
+ - client can send a primary all the operations that it could send to a standalone server.
+ - clients cannot write to secondaries. 
+ - clients by default cannot read from secondaries. This can be enabled explicitly though.
+
+replica set configurations can be changed anytime: add, remove members from the repl set
+you can change the existing config and reconfigure: rs.reconfig(newconfig)
+
+How to design a Set:
+majority of members to elect a primary. majority => more than half of all members in the set.
+
+members in set    majority of set
+1                 1
+2                 2
+3                 2
+4                 3
+5                 3
+6                 4
+7                 4
+
+example of 5 members in set and what happens when 3 goes down. the other can't reach a majority.
+how election works - considering priority and updated data (member with the most updated data)
+raft consensus
+hidden members 
+
+Arbiter: special member => only purpose is to participate in elections. hold no data and not used by clients.
+provide majority => 2 member set
+to add arbiter:
+rs.addArb("mongodarb:27017")
+rs.add({"_id" : 4, "host" : "mongodarb:27017", "arbiterOnly" : true})
+
+once an arbiter forever an arbiter
+
+Use at most one arbiter:
+odd no of nodes -> arbiter not needed
+because arbiter can cause ties with even nodes, also election takes time
+prefer data nodes over arbiter to be able to easily bootstrap a new server if one of data nodes die 
+PSA(Primary secondary Arbiter) architecture
+
+building indexes on secondary can be avoided if it's only for backup data or offline batch jobs with setting buildIndexes: false, this is permanent.
+
+Components of Repl Set:
+
+Syncing:
+oplog contains every write primary performs
+secondary queries this collection for op to replicate
+secondary => oplog => recording each operation replicated from primary. this allows any member to be used as sync source
+secondary => fetches ops from the member => apply that op to its dataset and then write ops to their oplog
+if secondary goes down and comes back up, its possible that it will replay some of the ops already applied to the dataset before but not written to oplog.
+mongo => handles this correctly so replaying doesn't have any side effect as each op in oplog is idempotent
+oplog => fixed size => hold only a certain no of ops
+kind of workloads require larger oplog: Updates to multiple documents at once, Deletions equal the same amount of data as inserts, Significant number of in-place updates
+Initial sync and replication, stale out-of-sync secondaries that need full resync or restoration from backup
+heartbeats: who's primary, who's down, who they can sync from, heartbeat sent out every two seconds. also it lets primary know majority of set is reachable; otherwise primary will demote itself and become secondary.
+member states
+elections
+rollback: happens when for instance, primary goes down before the latest op lets say op#126 is replicated to secondaries. When one of secondaries become primary, it will take the writes from it's last oplog op lets say op#125. And when primary comes back up as secondary, it has to rollback the op that wasn't replicated after it went down, in this case op#126. This is rollback.
